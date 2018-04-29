@@ -8,6 +8,11 @@ Partial Class SpydazWebAI_Service
     <System.Diagnostics.DebuggerNonUserCode()> _
     Protected Overrides Sub Dispose(ByVal disposing As Boolean)
         Try
+            My.Settings.Save()
+
+            If disposing AndAlso timerRhythm IsNot Nothing Then
+                timerRhythm.Dispose()
+            End If
             If disposing AndAlso components IsNot Nothing Then
                 components.Dispose()
             End If

@@ -6,9 +6,10 @@ Imports System.Net.Sockets
 Imports System.Text
 Imports System.Net
 Public Class Reciever
+    Implements IDisposable
     Public ThreadReceive As System.Threading.Thread
-    Dim receivingUdpClient As UdpClient
-    Dim RemoteIpEndPoint As New System.Net.IPEndPoint(System.Net.IPAddress.IPv6Loopback, 55547)
+    Dim receivingUdpClient As New UdpClient
+    Dim RemoteIpEndPoint As New System.Net.IPEndPoint(System.Net.IPAddress.Any, 55547)
 
     Public Sub New()
 
@@ -16,6 +17,7 @@ Public Class Reciever
         ThreadReceive = New System.Threading.Thread(AddressOf Receiving)
         ThreadReceive.Start()
     End Sub
+    Public Event DataRecieved(ByRef Str As String)
     Public Sub Receiving()
         Dim strReturnData As String = ""
 
@@ -25,10 +27,15 @@ Public Class Reciever
             strReturnData = System.Text.Encoding.ASCII.GetString(receiveBytes)
 
             RaiseEvent DataRecieved(strReturnData)
+
         Loop While strReturnData <> "Stop"
 
     End Sub
-    Public Event DataRecieved(ByRef Str As String)
+
+    Protected Sub Dispose() Implements IDisposable.Dispose
+        receivingUdpClient.Close()
+        ThreadReceive.Abort()
+    End Sub
 End Class
 Public Class AI_ServiceInterface
 
