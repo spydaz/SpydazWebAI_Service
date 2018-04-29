@@ -11,7 +11,6 @@ Partial Class SpydazWebAI_Service
             If disposing AndAlso components IsNot Nothing Then
                 components.Dispose()
             End If
-            Me.server.Dispose()
         Finally
             MyBase.Dispose(disposing)
         End Try
@@ -42,8 +41,15 @@ Partial Class SpydazWebAI_Service
     ' Do not modify it using the code editor.
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
-        components = New System.ComponentModel.Container()
+        '
+        'SpydazWebAI_Service
+        '
+        Me.CanHandlePowerEvent = True
+        Me.CanHandleSessionChangeEvent = True
+        Me.CanPauseAndContinue = True
+        Me.CanShutdown = True
         Me.ServiceName = "SpydazWebAI_Service"
+
     End Sub
 
 End Class

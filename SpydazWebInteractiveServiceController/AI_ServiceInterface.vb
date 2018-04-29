@@ -4,46 +4,67 @@ Imports System.Diagnostics
 Imports System.Threading
 Imports System.Net.Sockets
 Imports System.Text
-
-Class AI_ServiceInterface
-
-    Public CurrentState As AI_STATE
-    Public Structure AI_STATE
-        Dim State As String
-    End Structure
+Imports System.Net
+Public Class Reciever
     Public ThreadReceive As System.Threading.Thread
     Dim receivingUdpClient As UdpClient
-    Dim RemoteIpEndPoint As New System.Net.IPEndPoint(System.Net.IPAddress.Any, 0)
+    Dim RemoteIpEndPoint As New System.Net.IPEndPoint(System.Net.IPAddress.IPv6Loopback, 55547)
 
     Public Sub New()
-        RecieveMessages()
+
+        receivingUdpClient = New UdpClient(55547)
+        ThreadReceive = New System.Threading.Thread(AddressOf Receiving)
+        ThreadReceive.Start()
+    End Sub
+    Public Sub Receiving()
+        Dim strReturnData As String = ""
+
+        Do
+            Dim receiveBytes As [Byte]() = receivingUdpClient.Receive(RemoteIpEndPoint)
+
+            strReturnData = System.Text.Encoding.ASCII.GetString(receiveBytes)
+
+            RaiseEvent DataRecieved(strReturnData)
+        Loop While strReturnData <> "Stop"
+
+    End Sub
+    Public Event DataRecieved(ByRef Str As String)
+End Class
+Public Class AI_ServiceInterface
+
+    Public CurrentState As New AI_STATE
+    Public Structure AI_STATE
+        Public State As String
+    End Structure
+
+    Public WithEvents Recieve As New Reciever
+
+    Public Sub New()
+
+
+
     End Sub
 
-    Public Event DataRecieved(ByRef Str As String)
 
-    ''' <summary>
-    ''' Commands implemented in SpydazWeb AI Service (onCustomCommand)
-    ''' </summary>
-    Public Enum AI_ServiceCustomCommands
-        StopWorker = 128
-        GetState = 129
-        Log_AI_Responded = 130
-    End Enum 'SimpleServiceCustomCommands
-    Public Shared Sub CheckStatus()
-        Dim scServices() As ServiceController
+    Public Event NewDataArrived(ByRef Str As String)
+    Dim scServices() As ServiceController
+    Dim scTemp As ServiceController
+    Public Sub CheckStatus()
+
         scServices = ServiceController.GetServices()
-        Dim scTemp As ServiceController
+
         For Each scTemp In scServices
 
             If scTemp.ServiceName = "SpydazWebAI_Service" Then
                 ' Display properties for the Simple Service sample 
                 ' from the ServiceBase example
                 Dim sc As New ServiceController("SpydazWebAI_Service")
-                Console.WriteLine("Status = " + sc.Status.ToString())
-                Console.WriteLine("Can Pause and Continue = " +
-                    sc.CanPauseAndContinue.ToString())
-                Console.WriteLine("Can ShutDown = " + sc.CanShutdown.ToString())
-                Console.WriteLine("Can Stop = " + sc.CanStop.ToString())
+                Dim builder As New StringBuilder
+                builder.Append("Status = " + sc.Status.ToString() & vbNewLine)
+                builder.Append("Can Pause and Continue = " +
+                    sc.CanPauseAndContinue.ToString() & vbNewLine)
+                builder.Append("Can ShutDown = " + sc.CanShutdown.ToString() & vbNewLine)
+                builder.Append("Can Stop = " + sc.CanStop.ToString() & vbNewLine)
                 If sc.Status = ServiceControllerStatus.Stopped Then
                     sc.Start()
                     While sc.Status = ServiceControllerStatus.Stopped
@@ -58,42 +79,17 @@ Class AI_ServiceInterface
                 'Or use in OnCustomCommand are those between 128 And 255. 
                 'Integers below 128 correspond to system-reserved values.
 
-                'sc.ExecuteCommand(Fix(SimpleServiceCustomCommands.GetState))
-                'sc.Pause()
-                'While sc.Status <> ServiceControllerStatus.Paused
-                'Thread.Sleep(1000)
-                ' sc.Refresh()
-                ' End While
-                Console.WriteLine("Status = " + sc.Status.ToString())
+                'sc.ExecuteCommand(Fix(129))
+
+                builder.Append("Status = " + sc.Status.ToString() & vbNewLine)
                 sc.Continue()
                 While sc.Status = ServiceControllerStatus.Paused
-                    Thread.Sleep(1000)
+                    Thread.Sleep(10)
                     sc.Refresh()
                 End While
-                Console.WriteLine("Status = " + sc.Status.ToString())
-                sc.Stop()
-                While sc.Status <> ServiceControllerStatus.Stopped
-                    Thread.Sleep(1000)
-                    sc.Refresh()
-                End While
-                Console.WriteLine("Status = " + sc.Status.ToString())
-                'Dim argArray() As String = {"ServiceController arg1", "ServiceController arg2"}
-                'sc.Start(argArray)
-                While sc.Status = ServiceControllerStatus.Stopped
-                    Thread.Sleep(1000)
-                    sc.Refresh()
-                End While
-                Console.WriteLine("Status = " + sc.Status.ToString())
-                ' Display the event log entries for the custom commands
-                ' and the start arguments.
-                Dim el As New EventLog("Application")
-                Dim elec As EventLogEntryCollection = el.Entries
-                Dim ele As EventLogEntry
-                For Each ele In elec
-                    If ele.Source.IndexOf("SpydazWebAI_Service.OnCustomCommand") >= 0 Or ele.Source.IndexOf("SimpleService.Arguments") >= 0 Then
-                        Console.WriteLine(ele.Message)
-                    End If
-                Next ele
+                builder.Append("Status = " + sc.Status.ToString() & vbNewLine)
+                sc.Continue()
+                RaiseEvent NewDataArrived(builder.ToString)
             End If
         Next scTemp
         ' This sample displays the following output if the Simple Service
@@ -109,22 +105,20 @@ Class AI_ServiceInterface
         '4:14:49 PM - Custom command received: 128
         '4:14:49 PM - Custom command received: 129
     End Sub 'Main 
-    Private Sub DataArrived(ByRef Str As String) Handles Me.DataRecieved
+    Private Sub DataArrived(ByRef Str As String) Handles Recieve.DataRecieved
         Dim CaseNo As Integer = 0
         Dim Info As String = ""
         If Str.Contains("Request for Get State") = True Then
-            Info = Str.Remove("Request for Get State")
-            CaseNo = 129
-            SetState(Info)
+
+
+            ' SetState(Info)
         Else
         End If
-
+        RaiseEvent NewDataArrived(Str.Replace("Request for Get State", ""))
     End Sub
 
-    Public Sub PerformCommand(ByRef Cmd As AI_ServiceCustomCommands)
-        Dim scServices() As ServiceController
+    Public Sub PerformCommand(ByRef Cmd As Integer)
         scServices = ServiceController.GetServices()
-        Dim scTemp As ServiceController
         For Each scTemp In scServices
             If scTemp.ServiceName = "SpydazWebAI_Service" Then
                 ' Display properties for the Simple Service sample 
@@ -132,35 +126,81 @@ Class AI_ServiceInterface
                 Dim sc As New ServiceController("SpydazWebAI_Service")
                 'Perform Cmd
                 sc.ExecuteCommand(Fix(Cmd))
-                sc.Pause()
-                While sc.Status <> ServiceControllerStatus.Paused
-                    Thread.Sleep(1000)
-                    sc.Refresh()
-                End While
 
+                sc.Continue()
 
             Else
             End If
         Next scTemp
     End Sub
-    Public Sub Receiving()
-        Dim receiveBytes As [Byte]() = receivingUdpClient.Receive(RemoteIpEndPoint)
-        Dim strReturnData As String = System.Text.Encoding.Unicode.GetString(receiveBytes)
-        Dim Str As String = Encoding.ASCII.GetChars(receiveBytes)
-        RaiseEvent DataRecieved(Str)
-    End Sub
-    Public Sub RecieveMessages()
-        receivingUdpClient = New System.Net.Sockets.UdpClient(22525)
-        ThreadReceive = New System.Threading.Thread(AddressOf Receiving)
-        ThreadReceive.Start()
-    End Sub
-    Public Sub SetState(ByRef Str As String)
-        CurrentState.State = Str
-    End Sub
+    ''' <summary>
+    ''' The emotion type can be used to catagorize some of the basic emotions the list is just a
+    ''' basic collection of emotiontypes ; the emotion finder class uses these basic emotion
+    ''' types to describe the current emotion detected by the class. this type list is no a
+    ''' complete list.
+    ''' </summary>
+    Public Enum EmotionType
+        Joy = 131
+        Happy
+        Sad
+        Love
+        Laughing
+        Surprised
+        Sleepy
+        Serious
+        Angry
+        Jealous
+        curious
+        Concerned
+        Failure
+        Fear
+        Greatful
+        Neutral
+    End Enum
+    Public Sub SetState(ByRef Str As EmotionType)
+        Select Case Str
+            Case EmotionType.Joy
+                PerformCommand(131)
+            Case EmotionType.Happy
+                PerformCommand(132)
+            Case EmotionType.Sad
+                PerformCommand(133)
+            Case EmotionType.Love
+                PerformCommand(134)
+            Case EmotionType.Laughing
+                PerformCommand(135)
+            Case EmotionType.Surprised
+                PerformCommand(136)
+            Case EmotionType.Sleepy
+                PerformCommand(137)
+            Case EmotionType.Serious
+                PerformCommand(138)
+            Case EmotionType.Angry
+                PerformCommand(139)
+            Case EmotionType.Jealous
+                PerformCommand(140)
+            Case EmotionType.curious
+                PerformCommand(141)
+            Case EmotionType.Concerned
+                PerformCommand(142)
+            Case EmotionType.Failure
+                PerformCommand(143)
+            Case EmotionType.Fear
+                PerformCommand(144)
+            Case EmotionType.Greatful
+                PerformCommand(145)
+            Case EmotionType.Neutral
+                PerformCommand(146)
+        End Select
 
+        CurrentState.State = Str.ToString
+    End Sub
+    Public Sub GetState()
+        PerformCommand(129)
+    End Sub
     Protected Overrides Sub Finalize()
         MyBase.Finalize()
-        ThreadReceive.Abort()
+
     End Sub
 End Class 'Program
 
