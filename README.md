@@ -1,4 +1,4 @@
-# SpydazWebAI_Service
+# SpydazWebAI_Service Partof the SpydazWebAI project
 This is a windows service with a Wrapper to control the service. Custom-Commands can be sent to the service for it to execute; The Service returns information via TCP/UDP. ; To implment the service will need to be running (create installer) And A refference to the AI_ServiceController made; The controller controls the service
 
 
